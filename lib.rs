@@ -5,20 +5,54 @@ use ink_lang as ink;
 #[ink::contract]
 mod dot_rebase {
 
+    #[cfg(not(feature = "ink-as-dependency"))]
+    use ink_storage::{
+        collections::HashMap as StorageHashMap,
+        lazy::Lazy,
+    };
+
     /// Defines the storage of your contract.
     /// Add new fields to the below struct in order
     /// to add new static storage fields to your contract.
     #[ink(storage)]
     pub struct DotRebase {
-        /// Stores a single `bool` value on the storage.
-        value: bool,
+        /// Total token supply.
+        total_supply: Lazy<Balance>,
+        /// Mapping from owner to number of owned token.
+        balances: StorageHashMap<AccountId, Balance>,
+        /// Mapping of the token amount which an account is allowed to withdraw
+        /// from another account.
+        allowances: StorageHashMap<(AccountId, AccountId), Balance>,
+    }
+
+    /// Event emitted when a token transfer occurs.
+    #[ink(event)]
+    pub struct Transfer {
+        #[ink(topic)]
+        from: Option<AccountId>,
+        #[ink(topic)]
+        to: Option<AccountId>,
+        value: Balance,
     }
 
     impl DotRebase {
-        /// Constructor that initializes the `bool` value to the given `init_value`.
+        /// Creates a new ERC-20 contract with the specified initial supply.
         #[ink(constructor)]
-        pub fn new(init_value: bool) -> Self {
-            Self { value: init_value }
+        pub fn new(initial_supply: Balance) -> Self {
+            let caller = Self::env().caller();
+            let mut balances = StorageHashMap::new();
+            balances.insert(caller, initial_supply);
+            let instance = Self {
+                total_supply: Lazy::new(initial_supply),
+                balances,
+                allowances: StorageHashMap::new(),
+            };
+            Self::env().emit_event(Transfer {
+                from: None,
+                to: Some(caller),
+                value: initial_supply,
+            });
+            instance
         }
 
         /// Constructor that initializes the `bool` value to `false`.
@@ -29,18 +63,10 @@ mod dot_rebase {
             Self::new(Default::default())
         }
 
-        /// A message that can be called on instantiated contracts.
-        /// This one flips the value of the stored `bool` from `true`
-        /// to `false` and vice versa.
+        /// Returns the total token supply.
         #[ink(message)]
-        pub fn flip(&mut self) {
-            self.value = !self.value;
-        }
-
-        /// Simply returns the current value of our `bool`.
-        #[ink(message)]
-        pub fn get(&self) -> bool {
-            self.value
+        pub fn total_supply(&self) -> Balance {
+            *self.total_supply
         }
     }
 
@@ -52,20 +78,13 @@ mod dot_rebase {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
 
+        use ink_lang as ink;
+
         /// We test if the default constructor does its job.
-        #[test]
+        #[ink::test]
         fn default_works() {
             let dot_rebase = DotRebase::default();
-            assert_eq!(dot_rebase.get(), false);
-        }
-
-        /// We test a simple use case of our contract.
-        #[test]
-        fn it_works() {
-            let mut dot_rebase = DotRebase::new(false);
-            assert_eq!(dot_rebase.get(), false);
-            dot_rebase.flip();
-            assert_eq!(dot_rebase.get(), true);
+            assert_eq!(dot_rebase.total_supply(), 0);
         }
     }
 }
