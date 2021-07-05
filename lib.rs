@@ -55,8 +55,6 @@ mod dot_rebase {
             instance
         }
 
-        /// Constructor that initializes the `bool` value to `false`.
-        ///
         /// Constructors can delegate to other constructors.
         #[ink(constructor)]
         pub fn default() -> Self {
@@ -67,6 +65,11 @@ mod dot_rebase {
         #[ink(message)]
         pub fn total_supply(&self) -> Balance {
             *self.total_supply
+        }
+
+        #[ink(message)]
+        pub fn set_total_supply(&mut self, new_supply: Balance) {
+            self.total_supply = Lazy::new(new_supply);
         }
     }
 
